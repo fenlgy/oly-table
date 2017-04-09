@@ -14,17 +14,19 @@
 
     // 声明默认属性对象
     var pluginName = "olyTable",
+        pluginClassName = 'oly-table',
 
         defaults = {
             size: "normal",
-            className: "oly-table",
-            rowActiveClass:'acti',
+            // className: "oly-table",
+            rowActiveClass: 'acti',
             columns: null,
             dataSource: null,
             loading: false,
             bordered: true,
             scroll: false,
-            rowSelection:false, // 是否带check box
+            headFixed: false,
+            rowSelection: false, // 是否带check box
         };
 
 
@@ -37,7 +39,7 @@
         this._name = pluginName;
         this.init();
         //放置一些全局要用的变量，如jquery 对象
-        this.GLOBAL ={};
+        this.GLOBAL = {};
     }
 
     Plugin.VERSION = '0.0.1'
@@ -46,44 +48,56 @@
     $.extend(Plugin.prototype, {
         init: function () {
             const $element = $(this.$element);
-            const $table = $(this.getHtml().table);
+            const $table = $(this.getHtml());
 
             this.GLOBAL = {
-                $table : $table
+                $table: $table
             };
 
             $element.append($table);
+
             this.bindHandler()
 
         },
-        getHtml: function () {
+        getHtml: function (opt) {
+            let customClassName = this.settings.className ? ' ' + this.settings.className : '';
             const thead = this.generateThead(),
-                tbody = this.generateTbody();
+                tbody = this.generateTbody(),
+            isheadFixed = this.settings.headFixed;
 
-            let tableClassName = this._defaults.className;
-            return {
-                table: `<table class="${tableClassName}">${thead + tbody}</table>`,
-                thead: thead,
-                tbody: tbody
+            function getTable(con) {
+                return `<table class="${pluginClassName + customClassName}">${con}</table>`
             }
+
+            let html = '';
+            if(isheadFixed){
+                html = `<div class="${pluginClassName+'__wrapper'}">
+                            <div class="${pluginClassName+'__body'}">${getTable(tbody)}</div>
+                            <div class="${pluginClassName+'__fixed-thead'}">${getTable(thead)}</div>
+                         </div>`
+            }else{
+                html = `<div class="${pluginClassName+'__wrapper'}">${getTable(thead + tbody)}</div>`
+            }
+
+            return html
         },
-        destroy:function () {
-          console.log(this)
+        destroy: function () {
+            console.log(this)
         },
         bindHandler: function () {
             const that = this;
             let select = [];
 
             // tr 点击事件
-            this.GLOBAL.$table.on('click','tbody tr',function () {
-                const index = $(this).attr(pluginName+"-tr-index");
+            this.GLOBAL.$table.on('click', 'tbody tr', function () {
+                const index = $(this).attr(pluginName + "-tr-index");
 
                 $(this).addClass(that.settings.rowActiveClass)
 
                 // 调 onRowClick 时间，第一个参数当前tr的jquery对象 ，第二个参数：当前行的数据对象
-                that.settings.onRowClick && that.settings.onRowClick($(this),that.settings.dataSource[index])
+                that.settings.onRowClick && that.settings.onRowClick($(this), that.settings.dataSource[index])
             })
-                .on("click",'input:checkbox',function () {
+                .on("click", 'input:checkbox', function () {
 
                 })
         },
@@ -91,8 +105,8 @@
             let dom = '',
                 data = this.settings.columns;
 
-            if(this.settings.rowSelection){
-                dom = `<td><input type="checkbox"></td>`
+            if (this.settings.rowSelection) {
+                dom = `<th class="${pluginClassName + '__th-checkbox'}"><input type="checkbox"></th>`
             }
 
             $.each(data, function (index, value) {
@@ -111,15 +125,15 @@
 
             $.each(data, function (index, value) {
                 let tr = '';
-                if(isRowSelection){
+                if (isRowSelection) {
                     tr = `<td><input type="checkbox" value="${index}"></td>`
                 }
                 $.each(columns, function (i, val) {
                     //如果有render 方法的，直接调用render方法，并把这个td的值传进去
-                    if(val.render){
+                    if (val.render) {
                         // 传递2个值，第一个为该 td 的值，第二个为该行的对象
-                        tr += `<td>${val.render(value[val.dataIndex],value)}</td>`
-                    }else{
+                        tr += `<td>${val.render(value[val.dataIndex], value)}</td>`
+                    } else {
                         tr += `<td>${value[val.dataIndex]}</td>`
                     }
                 })

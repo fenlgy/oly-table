@@ -68,10 +68,12 @@
         $('#app').olyTable({
             columns: colums,
             dataSource: dataSource.list,
+            className:'test ddddd',
             onRowClick:function (ele,data){
                 console.log(ele,data)
             },
-            rowSelection:true
+            rowSelection:true,
+            headFixed:true
         })
 
         $('#app1').olyTable({
