@@ -72,8 +72,8 @@
             let html = '';
             if(isheadFixed){
                 html = `<div class="${pluginClassName+'__wrapper'}">
-                            <div class="${pluginClassName+'__body'}">${getTable(tbody)}</div>
                             <div class="${pluginClassName+'__fixed-thead'}">${getTable(thead)}</div>
+                            <div class="${pluginClassName+'__body'}">${getTable(tbody)}</div>
                          </div>`
             }else{
                 html = `<div class="${pluginClassName+'__wrapper'}">${getTable(thead + tbody)}</div>`
