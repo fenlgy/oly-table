@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit">
+    <title>myapp</title>
+    <link rel="stylesheet" href="style/index.css">
+    <script src="https://cdn.bootcss.com/require.js/2.3.3/require.js"></script>
+    <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+    <script src="js/index.js"></script>
+    <!--[if lt IE 10]>
+    <script src="https://as.alipayobjects.com/g/component/??console-polyfill/0.2.2/index.js,es5-shim/4.5.7/es5-shim.min.js,es5-shim/4.5.7/es5-sham.min.js,html5shiv/3.7.2/html5shiv.min.js,media-match/2.0.2/media.match.min.js"></script>
+    <![endif]-->
+</head>
+<body>
+<div id="app"></div>
+<div id="app1"></div>
+<script>
+
+    // 配置 Mock 路径
+    require.config({
+        paths: {
+            mock: 'http://mockjs.com/dist/mock'
+        }
+    })
+
+
+    // 加载 Mock
+    require(['mock'], function (Mock) {
+
+        var colums = [
+            {title: '姓名', dataIndex: 'name'},
+            {title: '地址', dataIndex: 'address'},
+            {
+                title: '邮箱', dataIndex: 'email', render: function (text) {
+                return '<a href="mailto:'+ text +'">' + text + '</a>'
+            }
+            },
+            {title: '年龄', dataIndex: 'year'},
+            {
+                title: '操作', render: function () {
+                return '<a href="#">详情</a>'
+            }
+            }
+        ]
+
+        // 使用 Mock
+        var dataSource = Mock.mock({
+            'list|10-20': [{
+                name: '@cname',
+                address: "@city",
+                email: "@email",
+                "year|20-35": 1
+            }]
+        })
+
+        var dataSource1 = Mock.mock({
+            'list|10-20': [{
+                name: '@cname',
+                address: "@city",
+                email: "@email",
+                "year|20-35": 1
+            }]
+        })
+
+
+        $('#app').olyTable({
+            columns: colums,
+            dataSource: dataSource.list,
+            onRowClick:function (ele,data){
+                console.log(ele,data)
+            },
+            rowSelection:true
+        })
+
+        $('#app1').olyTable({
+            columns: colums,
+            dataSource: dataSource1.list,
+        })
+
+        var instance = $("#app").data('plugin_olyTable');
+
+
+    })
+
+
+</script>
+</body>
+</html>
