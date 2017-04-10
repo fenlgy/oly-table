@@ -10,6 +10,7 @@ const sourcemaps = require('gulp-sourcemaps')
 const LessAutoprefix  = require('less-plugin-autoprefix')
 const autoprefix = new LessAutoprefix({ browsers: ['last 2 versions','ie >= 8'] });
 const babel = require('gulp-babel')
+const jshint = require('gulp-jshint')
 
 gulp.task('parseLess', function () {
     return gulp.src('src/style/*.less')
@@ -33,6 +34,14 @@ gulp.task('parseJs', function () {
         .pipe(gulp.dest('demo/js'));
 });
 
+gulp.task('jshint', function() {
+    var globs = [
+        'src/**/*.js', 'test/test.*.js', 'gulpfile.js', '!**/regexp/parser.js'
+    ]
+    return gulp.src(globs)
+        .pipe(jshint('.jshintrc'))
+        .pipe(jshint.reporter('jshint-stylish'))
+})
 
 // 静态服务器
 gulp.task('server', function() {
