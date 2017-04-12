@@ -38,6 +38,16 @@
                     title: '手机', dataIndex: 'phone', render: function (text) {
                     return '<a href="mailto:' + text + '">' + text + '</a>'
                 }
+                },{
+                    title:'sdfas',
+                    children: [
+                        {title: '地址', dataIndex: 'address'},
+                        {
+                            title: '手机', dataIndex: 'phone', render: function (text) {
+                            return '<a href="mailto:' + text + '">' + text + '</a>'
+                        }
+                        }
+                    ]
                 }
             ]
             },

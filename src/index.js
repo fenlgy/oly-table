@@ -9,11 +9,10 @@
 ;(function ($, window, document, undefined) {
 
 
-    function arrayDel(arr,val) {
-        var index = $.inArray(val,arr)
-        console.log(index)
-        if(index > -1){
-            arr.splice(index,1)
+    function arrayDel(arr, val) {
+        var index = $.inArray(val, arr)
+        if (index > -1) {
+            arr.splice(index, 1)
         }
     }
 
@@ -34,7 +33,7 @@
             dataSource: null,
             loading: false,
             bordered: true,
-            serialNumber:false, // 序号
+            serialNumber: false, // 序号
             scroll: false,
             headFixed: false,
             rowSelection: false, // 是否带check box
@@ -50,6 +49,7 @@
         this._name = pluginName;
         //放置一些全局要用的变量，如jquery 对象
         this.GLOBAL = {};
+        this._cached = {}
         this.init();
     }
 
@@ -66,8 +66,8 @@
         },
         getHtml: function () {
             let customClassName = this.settings.className ? ' ' + this.settings.className : '';
-            const thead = this.generateThead(),
-                tbody = this.generateTbody(),
+            const thead = this.getThead(),
+                tbody = this.getTbody(),
                 isheadFixed = this.settings.headFixed;
 
             function getTable(con) {
@@ -78,7 +78,7 @@
             if (isheadFixed) {
                 html = `<div class="${pluginClassName + '__wrapper'}">
                             <div class="${pluginClassName + '__fixed-thead'}">${getTable(thead)}</div>
-                            <div class="${pluginClassName + '__body'}">${getTable(tbody)}</div>
+                            <!--<div class="${pluginClassName + '__body'}">${getTable(tbody)}</div>-->
                          </div>`;
             } else {
                 html = `<div class="${pluginClassName + '__wrapper'}">${getTable(thead + tbody)}</div>`;
@@ -119,58 +119,163 @@
                 // 调 onRowClick 时间，第一个参数当前tr的jquery对象 ，第二个参数：当前行的数据对象
                 that.settings.onRowClick && that.settings.onRowClick($(this), that.settings.dataSource[index])
             })
-                // checkbox 选择事件
+            // checkbox 选择事件
                 .on("click", 'input:checkbox', function () {
 
-                    if($(this).hasClass('j-checkbox-all')){
+                    if ($(this).hasClass('j-checkbox-all')) {
                         let $otherCheckbox = $table.find('input').not($(this))
 
 
-                        if(this.checked){
+                        if (this.checked) {
                             select = []
-                            $otherCheckbox.prop('checked',true);
-                            $.each($otherCheckbox,function (index,val) {
+                            $otherCheckbox.prop('checked', true);
+                            $.each($otherCheckbox, function (index, val) {
                                 select.push(val.value)
                             })
-                        }else {
-                            $otherCheckbox.prop('checked',false)
+                        } else {
+                            $otherCheckbox.prop('checked', false)
                         }
                         return
                     }
 
-                    if(this.checked){
-                        arrayDel(select,this.value)
+                    if (this.checked) {
+                        arrayDel(select, this.value)
                         select.push(this.value)
-                    }else {
-                        arrayDel(select,this.value)
+                    } else {
+                        arrayDel(select, this.value)
                     }
 
-                    console.log(select)
 
                 })
         },
-        generateThead: function () {
+        _cache: function (name, fn) {
+            if (name in this._cached) {
+                return this._cached[name];
+            }
+            this._cached[name] = fn();
+            return this._cached[name];
+        },
+        groupedColumns: function (columns) {
+            const _groupColumns = (columns, currentRow = 0, parentColumn = {}, rows = []) => {
+                // track how many rows we got
+                rows[currentRow] = rows[currentRow] || [];
+                const grouped = [];
+                const setRowSpan = column => {
+                    const rowSpan = rows.length - currentRow;
+                    if (column &&
+                        !column.children &&
+                        rowSpan > 1 &&
+                        (!column.rowSpan || column.rowSpan < rowSpan)
+                    ) {
+                        column.rowSpan = rowSpan;
+                    }
+                };
+                columns.forEach((column, index) => {
+                    const newColumn = column;
+                    // const newColumn = { ...column };
+                    rows[currentRow].push(newColumn);
+                    parentColumn.colSpan = parentColumn.colSpan || 0;
+                    if (newColumn.children && newColumn.children.length > 0) {
+                        newColumn.children = _groupColumns(newColumn.children, currentRow + 1, newColumn, rows);
+                        parentColumn.colSpan = parentColumn.colSpan + newColumn.colSpan;
+                    } else {
+                        parentColumn.colSpan++;
+                    }
+                    // update rowspan to all same row columns
+                    for (let i = 0; i < rows[currentRow].length - 1; ++i) {
+                        setRowSpan(rows[currentRow][i]);
+                    }
+                    // last column, update rowspan immediately
+                    if (index + 1 === columns.length) {
+                        setRowSpan(newColumn);
+                    }
+                    grouped.push(newColumn);
+                });
+                return grouped;
+            };
+            return _groupColumns(columns);
+
+        },
+        getHeaderRows: function (columns, currentRow = 0, rows) {
+            rows = rows || [];
+            rows[currentRow] = rows[currentRow] || [];
+
+            columns.forEach(column => {
+                if (column.rowSpan && rows.length < column.rowSpan) {
+                    while (rows.length < column.rowSpan) {
+                        rows.push([]);
+                    }
+                }
+                const cell = {
+                    className: column.className || '',
+                    children: column.title,
+                };
+                if (column.children) {
+                    this.getHeaderRows(column.children, currentRow + 1, rows);
+                }
+                if ('colSpan' in column) {
+                    cell.colSpan = column.colSpan;
+                }
+                if ('rowSpan' in column) {
+                    cell.rowSpan = column.rowSpan;
+                }
+                if (cell.colSpan !== 0) {
+                    rows[currentRow].push(cell);
+                }
+            });
+            return rows.filter(row => row.length > 0);
+        },
+        normalizeCol: function (columns, cb) {
+            columns = columns || []
+
+            $.each(columns, function (index, column) {
+
+            })
+        },
+        wrapTr: function (str) {
+            return `<tr>${str}</tr>`
+        },
+        getThead: function () {
             let dom = '',
-                data = this.settings.columns;
+                that = this,
+                columns = this.getHeaderRows(this.groupedColumns(this.settings.columns))
 
-            if(this.settings.serialNumber){
-                dom = `<th class="${pluginClassName + '__th-checkbox'}">#</th>`
-            }
+            columns.forEach((column) => {
+                let tr = '';
 
-            if (this.settings.rowSelection) {
-                dom += `<th class="${pluginClassName + '__th-checkbox'}"><input type="checkbox" class="j-checkbox-all"></th>`
-            }
+                column.forEach((cell, i) => {
+                    // if(i == 0){
+                    //     if(this.settings.serialNumber){
+                    //         dom = `<th class="${pluginClassName + '__th-checkbox'}">#</th>`
+                    //     }
+                    //
+                    //     if (this.settings.rowSelection) {
+                    //         dom += `<th class="${pluginClassName + '__th-checkbox'}"><input type="checkbox" class="j-checkbox-all"></th>`
+                    //     }
+                    // }
 
+                    var colspan = cell.colSpan ? `colspan="${cell.colSpan}"` : '';
+                    var rowspan = cell.rowSpan ? `rowspan="${cell.rowSpan}"` : '';
+                    tr += `<th ${colspan}${rowspan}>${cell.children}</th>`
+                })
 
-            $.each(data, function (index, value) {
-                dom += `<th>${value.title}</th>`
+                dom += that.wrapTr(tr)
             })
 
-            const thead = `<thead><tr>${dom}</tr></thead>`;
+            console.log(dom)
 
+            // $.each(data, function (index, value) {
+            //     var colspan = value.colspan ? `colspan="${value.colspan}"` : '';
+            //     dom += `<th ${colspan}>${value.children}</th>`
+            //
+            // });
+
+            const thead = `<thead>${dom}</thead>`;
+
+            // console.log($.inArray('children',data))
             return thead
         },
-        generateTbody: function () {
+        getTbody: function () {
             let tbody = '',
                 isRowSelection = this.settings.rowSelection,
                 isSerialNumber = this.settings.serialNumber,
@@ -180,7 +285,7 @@
             $.each(data, function (index, value) {
                 let tr = '';
 
-                if(isSerialNumber){
+                if (isSerialNumber) {
                     tr = `<td class="${pluginClassName + '__th-checkbox'}">${index + 1}</td>`
                 }
 
@@ -189,21 +294,6 @@
                 }
 
                 $.each(columns, function (i, val) {
-
-                    //TODO 只支持二级，三级暂无需求
-                    if(val.children){
-                        $.each(val.children,function (ii, vv) {
-                            console.log(vv,1)
-                            //如果有render 方法的，直接调用render方法，并把这个td的值传进去
-                            if (vv.render) {
-                                // 传递2个值，第一个为该 td 的值，第二个为该行的对象
-                                tr += `<td>${vv.render(value[vv.dataIndex], value)}</td>`
-                            } else {
-                                tr += `<td>${value[vv.dataIndex]}</td>`
-                            }
-                        })
-                        return
-                    }
 
                     //如果有render 方法的，直接调用render方法，并把这个td的值传进去
                     if (val.render) {
@@ -222,7 +312,7 @@
             return dom
         },
         // 用 for 循环实现，但是性能没提升
-        // generateTbodyf: function () {
+        // getTbodyf: function () {
         //     let tbody = '',
         //         data = this.settings.dataSource,
         //         columns = this.settings.columns;
