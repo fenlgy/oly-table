@@ -9,10 +9,21 @@
 ;(function ($, window, document, undefined) {
 
 
-    function arrayDel(arr, val) {
+    function _arrayDel(arr, val) {
         var index = $.inArray(val, arr)
         if (index > -1) {
             arr.splice(index, 1)
+        }
+    }
+
+
+    // 如果变量有值则输出本身，没值则不输出
+    // 等式输出用于class，之类的html类标签属性
+    function _IF(variable, equ) {
+        if (equ) {
+            return variable ? `${equ}="${variable}"` : ''
+        } else {
+            return variable ? variable : ''
         }
     }
 
@@ -68,17 +79,20 @@
             let customClassName = this.settings.className ? ' ' + this.settings.className : '';
             const thead = this.getThead(),
                 tbody = this.getTbody(),
-                isheadFixed = this.settings.headFixed;
+                isheadFixed = this.settings.headFixed,
+                colgroup = this.getColgroup();
+
+            let fixedClassName = isheadFixed ? ` ${pluginClassName+'--fixed'}` : '';
 
             function getTable(con) {
-                return `<table class="${pluginClassName + customClassName}">${con}</table>`;
+                return `<table class="${pluginClassName + customClassName + fixedClassName}">${colgroup}${con}</table>`;
             }
 
             let html = '';
             if (isheadFixed) {
                 html = `<div class="${pluginClassName + '__wrapper'}">
                             <div class="${pluginClassName + '__fixed-thead'}">${getTable(thead)}</div>
-                            <!--<div class="${pluginClassName + '__body'}">${getTable(tbody)}</div>-->
+                            <div class="${pluginClassName + '__body'}">${getTable(tbody)}</div>
                          </div>`;
             } else {
                 html = `<div class="${pluginClassName + '__wrapper'}">${getTable(thead + tbody)}</div>`;
@@ -106,7 +120,7 @@
             this.settings.afterRender && this.settings.afterRender($(this.$element))
         },
         bindHandler: function () {
-            const that = this;
+            const _this = this;
             let select = [];
             const $table = this.GLOBAL.$table;
 
@@ -114,10 +128,10 @@
             $table.on('click', 'tbody tr', function () {
                 const index = $(this).attr(pluginName + "-tr-index");
 
-                $(this).addClass(that.settings.rowActiveClass)
+                $(this).addClass(_this.settings.rowActiveClass)
 
                 // 调 onRowClick 时间，第一个参数当前tr的jquery对象 ，第二个参数：当前行的数据对象
-                that.settings.onRowClick && that.settings.onRowClick($(this), that.settings.dataSource[index])
+                _this.settings.onRowClick && _this.settings.onRowClick($(this), _this.settings.dataSource[index])
             })
             // checkbox 选择事件
                 .on("click", 'input:checkbox', function () {
@@ -139,20 +153,23 @@
                     }
 
                     if (this.checked) {
-                        arrayDel(select, this.value)
+                        _arrayDel(select, this.value)
                         select.push(this.value)
                     } else {
-                        arrayDel(select, this.value)
+                        _arrayDel(select, this.value)
                     }
 
 
                 })
         },
-        _cache: function (name, fn) {
+        _cache: function (name, val) {
             if (name in this._cached) {
                 return this._cached[name];
             }
-            this._cached[name] = fn();
+
+            // TODO 需要判断 val 的类型赋值
+            this._cached[name] = val;
+
             return this._cached[name];
         },
         groupedColumns: function (columns) {
@@ -208,7 +225,7 @@
                 }
                 const cell = {
                     className: column.className || '',
-                    children: column.title,
+                    title: column.title,
                 };
                 if (column.children) {
                     this.getHeaderRows(column.children, currentRow + 1, rows);
@@ -225,91 +242,158 @@
             });
             return rows.filter(row => row.length > 0);
         },
-        normalizeCol: function (columns, cb) {
-            columns = columns || []
+        // 标准化数据，一份给编译 body 时候用，是一个一维数组
+        normalizeColumns: function () {
+            let compilerColumns = [];
+            const normalizeColumns = this.settings.columns;
+            this.getExtraCol().forEach(val => {
+                normalizeColumns.unshift(val)
+            });
 
-            $.each(columns, function (index, column) {
+            this._cache('normalizeColumns',normalizeColumns);
 
-            })
+            const _compilerColumns = (columns) => {
+                columns.forEach((val) => {
+                    if (val.children && val.children.length > 0) {
+                        _compilerColumns(val.children)
+                    } else {
+                        compilerColumns.push(val)
+                    }
+                })
+            };
+
+            _compilerColumns(normalizeColumns);
+
+            this._cache('compilerColumns',compilerColumns);
+
+            return compilerColumns
+
         },
-        wrapTr: function (str) {
-            return `<tr>${str}</tr>`
+        wrapTag: function (str,tag) {
+            return `<${tag}>${str}</${tag}>`
+        },
+        getExtraCol: function () {
+            const extraCol = [];
+            if (this.settings.rowSelection) {
+                extraCol.push({
+                    title: `<input type="checkbox" class="j-checkbox-all" />`,
+                    className: pluginClassName + '__th-checkbox',
+                    render: () => {
+                        return `<input type="checkbox" />`
+                    }
+                })
+            }
+
+            if (this.settings.serialNumber) {
+                extraCol.push({
+                    title: '#',
+                    className: pluginClassName + '__th-checkbox',
+                    render: (a, index) => {
+                        return `${index + 1}`
+                    }
+                })
+            }
+
+            return extraCol
+
+        },
+        setExtraCol: function (columns) {
+            const maxRowSpan = columns.length;
+            let newColums = columns;
+            const extraCol = this.getExtraCol();
+
+            extraCol.forEach((val) => {
+                val.rowSpan = maxRowSpan;
+                newColums[0].unshift(val)
+            })
+
+            return newColums
         },
         getThead: function () {
             let dom = '',
-                that = this,
-                columns = this.getHeaderRows(this.groupedColumns(this.settings.columns))
+                _this = this,
+                columns = this.getHeaderRows(this.groupedColumns(this.settings.columns));
 
-            columns.forEach((column) => {
+
+            // 添加序号、checkbox 等的列
+            const newColumns = this.setExtraCol(columns)
+
+            // 存储到 cache
+            this._cache('columns', newColumns)
+
+            // 标准化数据，成为一维数组
+            this.normalizeColumns(newColumns)
+
+            newColumns.forEach((column) => {
                 let tr = '';
 
                 column.forEach((cell, i) => {
-                    // if(i == 0){
-                    //     if(this.settings.serialNumber){
-                    //         dom = `<th class="${pluginClassName + '__th-checkbox'}">#</th>`
-                    //     }
-                    //
-                    //     if (this.settings.rowSelection) {
-                    //         dom += `<th class="${pluginClassName + '__th-checkbox'}"><input type="checkbox" class="j-checkbox-all"></th>`
-                    //     }
-                    // }
 
-                    var colspan = cell.colSpan ? `colspan="${cell.colSpan}"` : '';
-                    var rowspan = cell.rowSpan ? `rowspan="${cell.rowSpan}"` : '';
-                    tr += `<th ${colspan}${rowspan}>${cell.children}</th>`
+                    const colspan = _IF(cell.colSpan, 'colspan');
+                    const rowspan = _IF(cell.rowSpan, 'rowspan');
+                    const className = _IF(cell.className, 'class');
+
+                    console.log(colspan,rowspan,className)
+
+                    tr += `<th ${colspan}${rowspan}${className}>${cell.title}</th>`
                 })
 
-                dom += that.wrapTr(tr)
+                dom += _this.wrapTag(tr,'tr')
             })
 
-            console.log(dom)
-
-            // $.each(data, function (index, value) {
-            //     var colspan = value.colspan ? `colspan="${value.colspan}"` : '';
-            //     dom += `<th ${colspan}>${value.children}</th>`
-            //
-            // });
 
             const thead = `<thead>${dom}</thead>`;
 
             // console.log($.inArray('children',data))
             return thead
         },
-        getTbody: function () {
+        getBodyRows: function (dataSource) {
             let tbody = '',
-                isRowSelection = this.settings.rowSelection,
-                isSerialNumber = this.settings.serialNumber,
-                data = this.settings.dataSource,
-                columns = this.settings.columns;
+                row = '';
 
-            $.each(data, function (index, value) {
-                let tr = '';
+            const compilerColumns = this._cache('compilerColumns')
 
-                if (isSerialNumber) {
-                    tr = `<td class="${pluginClassName + '__th-checkbox'}">${index + 1}</td>`
-                }
+            const _getBodyRow = (value, columns, currentRow) => {
 
-                if (isRowSelection) {
-                    tr += `<td><input type="checkbox" value="${index}"></td>`
-                }
+                columns.forEach((val) => {
+                        //如果有render 方法的，直接调用render方法，并把这个td的值传进去
+                        if (val.render) {
+                            const cellData = value[val.dataIndex]
+                            // 传递 当前cell 的值 ， 索引 ， 当前行的数据对象
+                            row += `<td>${val.render(cellData, currentRow, value)}</td>`
+                        } else {
+                            row += `<td>${value[val.dataIndex]}</td>`
+                        }
+                });
 
-                $.each(columns, function (i, val) {
+                return row
+            };
 
-                    //如果有render 方法的，直接调用render方法，并把这个td的值传进去
-                    if (val.render) {
-                        // 传递2个值，第一个为该 td 的值，第二个为该行的对象
-                        tr += `<td>${val.render(value[val.dataIndex], value)}</td>`
-                    } else {
-                        tr += `<td>${value[val.dataIndex]}</td>`
-                    }
-                })
+            dataSource.forEach((value, index) => {
 
-                tbody += `<tr ${pluginName}-tr-index="${index}">${tr}</tr>`
-            })
+                row = '';
+                _getBodyRow(value, compilerColumns, index);
+                tbody += `<tr ${pluginName}-tr-index="${index}">${row}</tr>`
 
-            const dom = `<tbody>${tbody}</tbody>`;
+            });
 
-            return dom
+            return tbody
+        },
+        getTbody: function () {
+            const data = this.settings.dataSource;
+            const tbody = this.getBodyRows(data);
+
+            return `<tbody>${tbody}</tbody>`
+        },
+        getColgroup:function () {
+            let cols = '';
+
+            this._cache('compilerColumns').forEach(col => {
+                cols += `<col ${_IF(col.width,'width')} ${_IF(col.className,'class')}>`
+            });
+
+            return this.wrapTag(cols,'colgroup')
+
         },
         // 用 for 循环实现，但是性能没提升
         // getTbodyf: function () {

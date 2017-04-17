@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "del": "rimraf  node_modules"
+    "del": "rimraf  node_modules",
+    "prod": "rimraf ./prod && fis3 release prod -cd ./prod "
   },
   "repository": {
     "type": "git",
